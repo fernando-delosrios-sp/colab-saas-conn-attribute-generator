@@ -1,0 +1,185 @@
+{
+    "name": "Attribute Generator",
+    "description": "Attribute Generator is a connector that generates attributes based on a given expression.",
+    "commands": ["std:test-connection", "std:account:list", "std:account:read", "std:account:discover-schema"],
+    "supportsCustomSchemas": true,
+    "supportsStatefulCommands": true,
+    "showDebugLoggingOption": true,
+    "sourceConfigInitialValues": {
+        "search": "*",
+        "digits": 1,
+        "case": "same",
+        "expression": "#set($initial = $firstname.substring(0, 1))$initial$lastname",
+        "unique": false,
+        "refresh": false,
+        "spConnEnableStatefulCommands": true
+    },
+    "sourceConfig": [
+        {
+            "type": "menu",
+            "label": "Attributes",
+            "items": [
+                {
+                    "type": "menu",
+                    "label": "Connection Details",
+                    "items": [
+                        {
+                            "type": "section",
+                            "sectionTitle": "Identity Security Cloud connection configuration",
+                            "sectionHelpMessage": "Configuration details for Identity Security Cloud Tenant",
+                            "items": [
+                                {
+                                    "key": "baseurl",
+                                    "label": "Identity Security Cloud API URL",
+                                    "type": "url",
+                                    "required": true
+                                },
+                                {
+                                    "key": "clientId",
+                                    "label": "Personal Access Token ID",
+                                    "type": "text",
+                                    "required": true
+                                },
+                                {
+                                    "key": "clientSecret",
+                                    "label": "Personal Access Token secret",
+                                    "type": "secret",
+                                    "required": true
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "type": "section",
+                    "sectionTitle": "Attribute Generation Configuration",
+                    "sectionHelpMessage": "Add your attribute generation definitions here",
+                    "items": [
+                        {
+                            "key": "search",
+                            "label": "Identity Search Query",
+                            "type": "text",
+                            "required": true
+                        },
+                        {
+                            "key": "attributes",
+                            "label": "Attribute Generation Definitions",
+                            "titleKey": "query",
+                            "subtitleKey": "name",
+                            "dragNDropEnabled": true,
+                            "deleteButton": true,
+                            "editButton": true,
+                            "addButton": true,
+                            "copyButton": true,
+                            "buttonLabel": "New Account Attribute Definition",
+                            "type": "cardList",
+                            "helpKey": "Add definitions to build your attributes",
+                            "subMenus": [
+                                {
+                                    "label": "Attribute Configuration",
+                                    "items": [
+                                        {
+                                            "key": "name",
+                                            "label": "Attribute Name",
+                                            "type": "text",
+                                            "required": true,
+                                            "helpKey": "Attribute Name"
+                                        },
+                                        {
+                                            "key": "expression",
+                                            "label": "Apache Velocity expression",
+                                            "type": "text",
+                                            "required": true
+                                        },
+                                        {
+                                            "key": "unique",
+                                            "label": "Unique value?",
+                                            "type": "checkbox"
+                                        },
+                                        {
+                                            "key": "refresh",
+                                            "label": "Refresh on aggregation?",
+                                            "type": "checkbox",
+                                            "parentKey": "unique",
+                                            "parentValue": "false"
+                                        },
+                                        {
+                                            "key": "normalize",
+                                            "label": "Normalize special characters?",
+                                            "type": "checkbox"
+                                        },
+                                        {
+                                            "key": "spaces",
+                                            "label": "Remove spaces?",
+                                            "type": "checkbox"
+                                        },
+                                        {
+                                            "key": "case",
+                                            "label": "Case selection",
+                                            "type": "select",
+                                            "required": true,
+                                            "options": [
+                                                {
+                                                    "label": "Do not change",
+                                                    "value": "same"
+                                                },
+                                                {
+                                                    "label": "Lower case",
+                                                    "value": "lower"
+                                                },
+                                                {
+                                                    "label": "Upper case",
+                                                    "value": "upper"
+                                                },
+                                                {
+                                                    "label": "Capitalize",
+                                                    "value": "capitalize"
+                                                }
+                                            ]
+                                        },
+                                        {
+                                            "key": "counter",
+                                            "label": "Increasing counter?",
+                                            "type": "checkbox"
+                                        },
+                                        {
+                                            "key": "digits",
+                                            "label": "Minimum counter digits",
+                                            "type": "number",
+                                            "required": true,
+                                            "parentKey": "counter",
+                                            "parentValue": "true"
+                                        },
+                                        {
+                                            "key": "entitlement",
+                                            "label": "Assigned by entitlement?",
+                                            "type": "checkbox"
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "accountSchema": {
+        "identityAttribute": "id",
+        "displayAttribute": "name",
+        "groupAttribute": "groups",
+        "attributes": [
+            {
+                "name": "id",
+                "type": "string",
+                "description": "Account ID"
+            },
+            {
+                "name": "name",
+                "type": "string",
+                "description": "Account name"
+            }
+        ]
+    },
+    "entitlementSchemas": []
+}
