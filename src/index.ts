@@ -21,8 +21,6 @@ export const connector = async () => {
     logger.debug('Initializing connector')
     // Get connector source config
     let config: Config = await readConfig()
-    const attributes = config.attributes ?? []
-    logger.debug(`Loaded configuration with ${attributes.length} attributes`)
 
     // Use the vendor SDK, or implement own client as necessary, to initialize a client
     const isc = new ISCClient(config)
@@ -32,8 +30,12 @@ export const connector = async () => {
     const source = sources.find(
         (x) => (x as any).connectorAttributes.spConnectorInstanceId === config.spConnectorInstanceId
     )!
-    const sourceId = source.id
-    logger.debug(`Found matching source with ID: ${sourceId}`)
+    const sourceId = source.id as string
+    if (!sourceId) {
+        throw new ConnectorError('Source ID not found')
+    } else {
+        logger.debug(`Found matching source with ID: ${sourceId}`)
+    }
 
     const stdTestConnection: StdTestConnectionHandler = async (context, input, res) => {
         logger.debug('Testing connection')
@@ -70,25 +72,24 @@ export const connector = async () => {
         logger.debug('Starting account list operation')
         const config: Config = await readConfig()
         const attributes = config.attributes ?? []
-        const stateWrapper = new StateWrapper((input.state as Map<string, number>) ?? new Map())
+        const stateWrapper = new StateWrapper(input.state)
 
         const uniqueAttributes = attributes.filter((x) => x.unique).map((x) => x.name)
         logger.debug(`Processing ${uniqueAttributes.length} unique attributes`)
         const valuesMap = new Map<string, string[]>()
 
         try {
-            logger.debug(`Searching identities with query: ${config.search}`)
-            const identities = (await isc.search(config.search, Index.Identities)) as IdentityDocument[]
+            const identities = (await isc.search(config.search, Index.Identities, false)) as IdentityDocument[]
             logger.debug(`Found ${identities.length} identities`)
+            const accounts = await isc.listAccountsBySource(sourceId)
+            logger.debug(`Found ${accounts.length} accounts`)
             const accountsMap = new Map(
-                identities.map((x) => {
-                    return [x.id, x.accounts?.find((y) => y.source?.id === sourceId)?.accountAttributes]
+                accounts.map((x) => {
+                    return [x.identityId!, x.attributes]
                 })
             )
-            logger.debug(`Mapped ${accountsMap.size} accounts`)
-
             for (const attribute of uniqueAttributes) {
-                const values = identities.map((x) => x.attributes?.[attribute]).filter((x) => x)
+                const values = accounts.map((x) => x.attributes?.[attribute]).filter((x) => x)
                 valuesMap.set(attribute, values)
                 logger.debug(`Collected ${values.length} values for attribute ${attribute}`)
             }
@@ -107,12 +108,14 @@ export const connector = async () => {
                             accountsMap.set(identity.id, account)
                         }
                         if (identity.attributes) {
-                            account![definition.name] = buildAttribute(
+                            const value = buildAttribute(
                                 definition,
                                 identity.attributes,
                                 stateWrapper.getCounter(definition.name, definition.counter),
                                 valuesMap.get(definition.name)
                             )
+                            account![definition.name] = value
+                            identity.attributes[definition.name] = value
                         } else {
                             logger.error(`Identity ${identity.id} has no attributes`)
                             throw new ConnectorError(`Identity ${identity.id} has no attributes`)
@@ -121,16 +124,17 @@ export const connector = async () => {
                 }
             }
 
-            for (const accountAttributes of accountsMap.values()) {
-                if (accountAttributes) {
-                    const account = new Account(accountAttributes)
-                    logger.debug(`Sending account with ID: ${accountAttributes.id}`)
-                    res.send(account)
-                }
+            for (const identity of identities) {
+                const accountAttributes = accountsMap.get(identity.id)!
+                const account = new Account(accountAttributes)
+                logger.debug(`Sending account with ID: ${accountAttributes.id}`)
+                res.send(account)
             }
 
-            logger.debug('Saving state')
-            res.saveState(stateWrapper.state)
+            logger.info('Saving state')
+            const stateObject = Object.fromEntries(stateWrapper.state)
+            logger.info(stateObject)
+            res.saveState(stateObject)
         } catch (error) {
             logger.error(`Error in account list operation: ${error}`)
             throw new ConnectorError(error as string)
@@ -155,11 +159,9 @@ export const connector = async () => {
                     }
                 }
                 if (identity.attributes) {
-                    accountAttributes![definition.name] = buildAttribute(
-                        definition,
-                        identity.attributes,
-                        StateWrapper.getCounter()
-                    )
+                    const value = buildAttribute(definition, identity.attributes, StateWrapper.getCounter())
+                    accountAttributes![definition.name] = value
+                    identity.attributes[definition.name] = value
                 } else {
                     logger.error(`Identity ${identity.id} has no attributes`)
                     throw new ConnectorError(`Identity ${identity.id} has no attributes`)
@@ -172,7 +174,6 @@ export const connector = async () => {
         res.send(account)
     }
 
-    logger.debug('Creating connector with handlers')
     return createConnector()
         .stdTestConnection(stdTestConnection)
         .stdAccountList(stdAccountList)

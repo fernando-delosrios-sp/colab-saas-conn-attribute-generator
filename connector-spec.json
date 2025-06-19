@@ -11,45 +11,45 @@
         "case": "same",
         "expression": "#set($initial = $firstname.substring(0, 1))$initial$lastname",
         "unique": false,
-        "refresh": true,
+        "refresh": false,
         "spConnEnableStatefulCommands": true
     },
     "sourceConfig": [
         {
             "type": "menu",
-            "label": "Attributes",
+            "label": "Connection Details",
             "items": [
                 {
-                    "type": "menu",
-                    "label": "Connection Details",
+                    "type": "section",
+                    "sectionTitle": "Identity Security Cloud connection configuration",
+                    "sectionHelpMessage": "Configuration details for Identity Security Cloud Tenant",
                     "items": [
                         {
-                            "type": "section",
-                            "sectionTitle": "Identity Security Cloud connection configuration",
-                            "sectionHelpMessage": "Configuration details for Identity Security Cloud Tenant",
-                            "items": [
-                                {
-                                    "key": "baseurl",
-                                    "label": "Identity Security Cloud API URL",
-                                    "type": "url",
-                                    "required": true
-                                },
-                                {
-                                    "key": "clientId",
-                                    "label": "Personal Access Token ID",
-                                    "type": "text",
-                                    "required": true
-                                },
-                                {
-                                    "key": "clientSecret",
-                                    "label": "Personal Access Token secret",
-                                    "type": "secret",
-                                    "required": true
-                                }
-                            ]
+                            "key": "baseurl",
+                            "label": "Identity Security Cloud API URL",
+                            "type": "url",
+                            "required": true
+                        },
+                        {
+                            "key": "clientId",
+                            "label": "Personal Access Token ID",
+                            "type": "text",
+                            "required": true
+                        },
+                        {
+                            "key": "clientSecret",
+                            "label": "Personal Access Token secret",
+                            "type": "secret",
+                            "required": true
                         }
                     ]
-                },
+                }
+            ]
+        },
+        {
+            "type": "menu",
+            "label": "Attributes",
+            "items": [
                 {
                     "type": "section",
                     "sectionTitle": "Attribute Generation Configuration",
@@ -82,36 +82,13 @@
                                             "key": "name",
                                             "label": "Attribute Name",
                                             "type": "text",
-                                            "required": true,
-                                            "helpKey": "Attribute Name"
+                                            "required": true
                                         },
                                         {
                                             "key": "expression",
                                             "label": "Apache Velocity expression",
                                             "type": "text",
                                             "required": true
-                                        },
-                                        {
-                                            "key": "unique",
-                                            "label": "Unique value?",
-                                            "type": "checkbox"
-                                        },
-                                        {
-                                            "key": "refresh",
-                                            "label": "Refresh on each aggregation?",
-                                            "type": "checkbox",
-                                            "parentKey": "unique",
-                                            "parentValue": "false"
-                                        },
-                                        {
-                                            "key": "normalize",
-                                            "label": "Normalize special characters?",
-                                            "type": "checkbox"
-                                        },
-                                        {
-                                            "key": "spaces",
-                                            "label": "Remove spaces?",
-                                            "type": "checkbox"
                                         },
                                         {
                                             "key": "case",
@@ -138,6 +115,16 @@
                                             ]
                                         },
                                         {
+                                            "key": "normalize",
+                                            "label": "Normalize special characters?",
+                                            "type": "checkbox"
+                                        },
+                                        {
+                                            "key": "spaces",
+                                            "label": "Remove spaces?",
+                                            "type": "checkbox"
+                                        },
+                                        {
                                             "key": "counter",
                                             "label": "Increasing counter?",
                                             "type": "checkbox"
@@ -149,10 +136,28 @@
                                             "required": true,
                                             "parentKey": "counter",
                                             "parentValue": "true"
+                                        },
+                                        {
+                                            "key": "unique",
+                                            "label": "Unique value?",
+                                            "type": "checkbox"
+                                        },
+                                        {
+                                            "key": "refresh",
+                                            "label": "Refresh on each aggregation?",
+                                            "type": "checkbox",
+                                            "parentKey": "unique",
+                                            "parentValue": "false"
                                         }
                                     ]
                                 }
                             ]
+                        },
+                        {
+                            "key": "spConnEnableStatefulCommands",
+                            "label": "Support for incremental counters",
+                            "required": true,
+                            "type": "checkbox"
                         }
                     ]
                 }

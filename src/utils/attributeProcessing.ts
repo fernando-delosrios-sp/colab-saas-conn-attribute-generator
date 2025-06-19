@@ -11,8 +11,16 @@ import {
 import { logger } from '@sailpoint/connector-sdk'
 
 export class StateWrapper {
-    constructor(public state: Map<string, number>) {
-        logger.debug(`Initializing StateWrapper with state: ${JSON.stringify(Object.fromEntries(state))}`)
+    state: Map<string, number> = new Map()
+
+    constructor(state: any) {
+        logger.info(`Initializing StateWrapper with state`)
+        logger.info(state)
+        try {
+            this.state = new Map(Object.entries(state))
+        } catch (e) {
+            logger.error('Failed to convert state object to Map. Initializing with empty Map')
+        }
     }
 
     static getCounter(): () => number {
@@ -36,6 +44,12 @@ export class StateWrapper {
             }
         } else {
             return StateWrapper.getCounter()
+        }
+    }
+
+    initCounter(key: string) {
+        if (!this.state.has(key)) {
+            this.state.set(key, 0)
         }
     }
 }

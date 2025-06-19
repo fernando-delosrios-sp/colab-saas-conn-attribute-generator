@@ -22,10 +22,12 @@ coverage/
 input.json
 config.json
 
-/reports
-/exportedObjects
+test/
+reports/
+exportedObjects/
 # Sentry Config File
 .sentryclirc
 .httpyac.json
 
 .env
+test/actions.http
