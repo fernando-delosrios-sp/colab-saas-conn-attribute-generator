@@ -138,7 +138,7 @@
                                         },
                                         {
                                             "key": "digits",
-                                            "label": "Minimum counter digits",
+                                            "label": "Minimum counter digits ($counter)",
                                             "type": "number",
                                             "required": true,
                                             "parentKey": "type",

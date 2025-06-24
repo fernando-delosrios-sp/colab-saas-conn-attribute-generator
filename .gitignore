@@ -30,4 +30,4 @@ exportedObjects/
 .httpyac.json
 
 .env
-test/actions.http
+package-lock.json
