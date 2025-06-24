@@ -33,23 +33,19 @@ export class StateWrapper {
         }
     }
 
-    getCounter(key: string, persist: boolean = false): () => number {
-        logger.debug(`Getting counter for key: ${key}, persist: ${persist}`)
-        if (persist) {
-            return () => {
-                const currentValue = this.state.get(key) ?? 0
-                this.state.set(key, currentValue + 1)
-                logger.debug(`Persistent counter for key ${key} incremented to: ${currentValue + 1}`)
-                return currentValue
-            }
-        } else {
-            return StateWrapper.getCounter()
+    getCounter(key: string): () => number {
+        logger.debug(`Getting counter for key: ${key}`)
+        return () => {
+            const currentValue = this.state.get(key) ?? 1
+            this.state.set(key, currentValue + 1)
+            logger.debug(`Persistent counter for key ${key} incremented to: ${currentValue + 1}`)
+            return currentValue
         }
     }
 
     initCounter(key: string) {
         if (!this.state.has(key)) {
-            this.state.set(key, 0)
+            this.state.set(key, 1)
         }
     }
 }
@@ -94,7 +90,7 @@ export const buildAttribute = (
         )}, attributes: ${JSON.stringify(attributes)}, values: ${JSON.stringify(values)}`
     )
 
-    if (definition.counter) {
+    if (definition.type === 'counter') {
         if (counter) {
             attributes.counter = padNumber(counter(), definition.digits)
             logger.debug(`Counter value set for attribute ${definition.name}: ${attributes.counter}`)
@@ -104,14 +100,14 @@ export const buildAttribute = (
         }
     }
 
-    if (definition.unique) {
+    if (definition.type === 'unique') {
         logger.debug(`Processing unique attribute: ${definition.name}`)
         attributes.counter = ''
     }
 
     let value = processAttributeDefinition(definition, attributes, counter, values)
 
-    if (definition.unique) {
+    if (definition.type === 'unique') {
         if (!templateHasVariable(definition.expression, 'counter')) {
             logger.debug(`Adding counter variable to expression for unique attribute: ${definition.name}`)
             definition.expression = definition.expression + '$counter'

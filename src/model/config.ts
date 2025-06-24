@@ -5,9 +5,8 @@ export interface Attribute {
     normalize: boolean
     spaces: boolean
     case: 'same' | 'lower' | 'upper' | 'capitalize'
-    counter: boolean
+    type: 'normal' | 'unique' | 'counter'
     digits: number
-    unique: boolean
 }
 
 export interface Config {

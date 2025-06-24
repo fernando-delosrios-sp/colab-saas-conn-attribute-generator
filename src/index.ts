@@ -8,6 +8,8 @@ import {
     AccountSchema,
     StdAccountListHandler,
     StdAccountReadHandler,
+    Patch,
+    PatchOp,
 } from '@sailpoint/connector-sdk'
 import { ISCClient } from './isc-client'
 import { Config } from './model/config'
@@ -74,7 +76,7 @@ export const connector = async () => {
         const attributes = config.attributes ?? []
         const stateWrapper = new StateWrapper(input.state)
 
-        const uniqueAttributes = attributes.filter((x) => x.unique).map((x) => x.name)
+        const uniqueAttributes = attributes.filter((x) => x.type === 'unique').map((x) => x.name)
         logger.debug(`Processing ${uniqueAttributes.length} unique attributes`)
         const valuesMap = new Map<string, string[]>()
 
@@ -96,9 +98,23 @@ export const connector = async () => {
 
             for (const definition of attributes) {
                 logger.debug(`Processing attribute definition: ${definition.name}`)
+                if (definition.refresh) {
+                    logger.debug(`Refresh flag is set for attribute ${definition.name}.`)
+
+                    if (definition.type === 'counter') {
+                        logger.debug(`Resetting counter for attribute ${definition.name}`)
+                        stateWrapper.initCounter(definition.name)
+                    }
+
+                    if (definition.type === 'unique') {
+                        logger.debug(`Resetting values for attribute ${definition.name}`)
+                        valuesMap.set(definition.name, [])
+                    }
+                }
+
                 for (const identity of identities) {
                     let account = accountsMap.get(identity.id)
-                    if (definition.refresh || !account || !account[definition.name]) {
+                    if (definition.refresh || !account || account[definition.name] === undefined) {
                         logger.debug(`Building attribute ${definition.name} for identity ${identity.id}`)
                         if (!account) {
                             account = {
@@ -111,7 +127,7 @@ export const connector = async () => {
                             const value = buildAttribute(
                                 definition,
                                 identity.attributes,
-                                stateWrapper.getCounter(definition.name, definition.counter),
+                                stateWrapper.getCounter(definition.name),
                                 valuesMap.get(definition.name)
                             )
                             account![definition.name] = value
@@ -149,8 +165,14 @@ export const connector = async () => {
         let accountAttributes = identity.accounts?.find((x) => x.source?.id === sourceId)?.accountAttributes!
 
         for (const definition of attributes) {
-            const refresh = definition.refresh && !definition.unique
-            if (refresh || !accountAttributes[definition.name]) {
+            let refresh = definition.refresh
+            if (definition.type === 'unique' || definition.type === 'counter') {
+                logger.info(
+                    `Skipping refresh for attribute ${definition.name} because it is of ${definition.type} type`
+                )
+                refresh = false
+            }
+            if (refresh || accountAttributes[definition.name] === undefined) {
                 logger.debug(`Building attribute ${definition.name} for identity ${identity.id}`)
                 if (!accountAttributes) {
                     accountAttributes = {

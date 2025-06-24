@@ -12,6 +12,8 @@
         "expression": "#set($initial = $firstname.substring(0, 1))$initial$lastname",
         "unique": false,
         "refresh": false,
+        "force": false,
+        "type": "normal",
         "spConnEnableStatefulCommands": true
     },
     "sourceConfig": [
@@ -87,7 +89,7 @@
                                         {
                                             "key": "expression",
                                             "label": "Apache Velocity expression",
-                                            "type": "text",
+                                            "type": "textarea",
                                             "required": true
                                         },
                                         {
@@ -115,39 +117,47 @@
                                             ]
                                         },
                                         {
-                                            "key": "normalize",
-                                            "label": "Normalize special characters?",
-                                            "type": "checkbox"
-                                        },
-                                        {
-                                            "key": "spaces",
-                                            "label": "Remove spaces?",
-                                            "type": "checkbox"
-                                        },
-                                        {
-                                            "key": "counter",
-                                            "label": "Increasing counter?",
-                                            "type": "checkbox"
+                                            "key": "type",
+                                            "label": "Attribute Type",
+                                            "type": "select",
+                                            "required": true,
+                                            "options": [
+                                                {
+                                                    "label": "Normal",
+                                                    "value": "normal"
+                                                },
+                                                {
+                                                    "label": "Unique",
+                                                    "value": "unique"
+                                                },
+                                                {
+                                                    "label": "Counter-based",
+                                                    "value": "counter"
+                                                }
+                                            ]
                                         },
                                         {
                                             "key": "digits",
                                             "label": "Minimum counter digits",
                                             "type": "number",
                                             "required": true,
-                                            "parentKey": "counter",
-                                            "parentValue": "true"
+                                            "parentKey": "type",
+                                            "parentValue": "counter"
                                         },
                                         {
-                                            "key": "unique",
-                                            "label": "Unique value?",
-                                            "type": "checkbox"
+                                            "key": "normalize",
+                                            "label": "Normalize special characters?",
+                                            "type": "toggle"
+                                        },
+                                        {
+                                            "key": "spaces",
+                                            "label": "Remove spaces?",
+                                            "type": "toggle"
                                         },
                                         {
                                             "key": "refresh",
                                             "label": "Refresh on each aggregation?",
-                                            "type": "checkbox",
-                                            "parentKey": "unique",
-                                            "parentValue": "false"
+                                            "type": "toggle"
                                         }
                                     ]
                                 }
@@ -157,7 +167,7 @@
                             "key": "spConnEnableStatefulCommands",
                             "label": "Support for incremental counters",
                             "required": true,
-                            "type": "checkbox"
+                            "type": "toggle"
                         }
                     ]
                 }
