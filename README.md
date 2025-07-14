@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 [![Discourse Topics][discourse-shield]][discourse-url]
 [![Issues][issues-shield]][issues-url]
 [![Latest Releases][release-shield]][release-url]
@@ -406,4 +405,3 @@ This project is private and proprietary.
 ## Support
 
 For support, please contact your SailPoint representative or open an issue in this repository.
->>>>>>> source/main
