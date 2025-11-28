@@ -23,12 +23,13 @@
         "refresh": false,
         "force": false,
         "type": "normal",
-        "spConnEnableStatefulCommands": true
+        "spConnEnableStatefulCommands": true,
+        "keepManuallyGenerated": true
     },
     "sourceConfig": [
         {
             "type": "menu",
-            "label": "Connection Details",
+            "label": "Connection Configuration",
             "items": [
                 {
                     "type": "section",
@@ -59,18 +60,26 @@
         },
         {
             "type": "menu",
-            "label": "Attributes",
+            "label": "Attribute Configuration",
             "items": [
                 {
                     "type": "section",
-                    "sectionTitle": "Attribute Generation Configuration",
-                    "sectionHelpMessage": "<strong>Define how account attributes are generated.</strong><br><br>Toggle <strong>Use search for aggregation?</strong> to build attributes using results from an Identity search.<br><br>When search is enabled, enter an <strong>Identity Search Query</strong> to select which identities to use for aggregation.<br><br>Use <strong>Attribute Generation Definitions</strong> to add cards, each describing how a single attribute is built (name, expression, case, type, counters, normalization, and refresh behavior).<br><br>Toggle <strong>Support for incremental counters</strong> to allow stateful commands so counter-based attributes can increment across runs.",
+                    "sectionTitle": "Attribute Generation Settings",
+                    "sectionHelpMessage": "<strong>Define how account attributes are generated.</strong><br><br>Use <strong>Use search for aggregation?</strong> to optionally build attributes using results from an Identity search instead of only this source's accounts.<br><br>When search is enabled, enter an <strong>Identity Search Query</strong>. If <strong>Keep manually generated accounts outside the search query</strong> is enabled, accounts that were manually generated from this source are always included in aggregation even if they do not match the search query.<br><br>Use <strong>Attribute Generation Definitions</strong> to configure how each attribute is built (name, Apache Velocity expression, case, type, counter start, minimum counter digits, normalization, spacing, and refresh behavior). Counter-based and unique attributes can leverage incremental counters and existing values; when <strong>Refresh on each aggregation?</strong> is enabled for one of these attributes, its counter and collected values are reset on each run.<br><br>Toggle <strong>Support for incremental counters</strong> to enable stateful commands required for counter-based attributes to increment across connector runs.",
                     "items": [
                         {
                             "key": "useSearch",
                             "label": "Use search for aggregation?",
                             "type": "toggle",
                             "required": false
+                        },
+                        {
+                            "key": "keepManuallyGenerated",
+                            "label": "Keep manually generated accounts outside the search query",
+                            "type": "toggle",
+                            "required": false,
+                            "parentKey": "useSearch",
+                            "parentValue": "true"
                         },
                         {
                             "key": "search",
@@ -220,7 +229,7 @@
                 "description": "Actions",
                 "entitlement": true,
                 "managed": true,
-                "multiple": false,
+                "multiple": true,
                 "schemaObjectType": "action"
             }
         ]

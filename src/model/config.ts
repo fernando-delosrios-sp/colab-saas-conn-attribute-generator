@@ -21,4 +21,5 @@ export interface Config {
     counters?: Map<string, number>
     search?: string
     useSearch?: boolean
+    keepManuallyGenerated?: boolean
 }

@@ -38,6 +38,7 @@ export const connector = async () => {
     const sourceId = source.id as string
     assert(sourceId, 'Source ID not found')
     logger.debug(`Found matching source with ID: ${sourceId}`)
+    assert(!(config.useSearch && config.search !== undefined), 'Search query not found')
 
     const stdTestConnection: StdTestConnectionHandler = async (context, input, res) => {
         logger.debug('Testing connection')
@@ -79,20 +80,19 @@ export const connector = async () => {
         const valuesMap = new Map<string, string[]>()
 
         try {
-            let search = ''
+            let search = `@accounts(source.id:${sourceId})`
             if (config.useSearch) {
-                if (config.search) {
-                    search = `${config.search.trim()} OR @accounts(source.id:${sourceId})`
+                if (config.keepManuallyGenerated) {
+                    search += ` OR ${config.search!.trim()}`
                 } else {
-                    logger.warn('No search query provided, using default search')
+                    search = config.search!.trim()
                 }
-            } else {
-                search = `@accounts(source.id:${sourceId})`
             }
+            logger.info(`Using search query: ${search}`)
             const identities = (await isc.search(search, Index.Identities, true)) as IdentityDocument[]
-            logger.debug(`Found ${identities.length} identities`)
+            logger.info(`Found ${identities.length} identities`)
             const accounts = await isc.listAccountsBySource(sourceId)
-            logger.debug(`Found ${accounts.length} accounts`)
+            logger.info(`Found ${accounts.length} accounts`)
             const accountsMap = new Map(accounts.map((x) => [x.identityId!, x]))
 
             for (const attribute of uniqueAttributes) {
@@ -160,6 +160,19 @@ export const connector = async () => {
 
     const stdAccountUpdate: StdAccountUpdateHandler = async (context, input, res) => {
         logger.debug(`Updating account for identity: ${input.identity}`)
+
+        for (const change of input.changes) {
+            switch (change.op) {
+                case AttributeChangeOp.Set:
+                    break
+                case AttributeChangeOp.Add:
+                    break
+                case AttributeChangeOp.Remove:
+                    break
+                default:
+                    throw new ConnectorError('Only Set operations are supported')
+            }
+        }
 
         if (input.changes.find((x) => x.op !== AttributeChangeOp.Set)) {
             throw new ConnectorError('Only Set operations are supported')
