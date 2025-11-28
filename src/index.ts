@@ -101,23 +101,6 @@ export const connector = async () => {
                 logger.debug(`Collected ${values.length} values for attribute ${attribute}`)
             }
 
-            for (const definition of attributes) {
-                logger.debug(`Processing attribute definition: ${definition.name}`)
-                if (definition.refresh) {
-                    logger.debug(`Refresh flag is set for attribute ${definition.name}.`)
-
-                    if (definition.type === 'counter') {
-                        logger.debug(`Resetting counter for attribute ${definition.name}`)
-                        stateWrapper.initCounter(definition.name, definition.counterStart)
-                    }
-
-                    if (definition.type === 'unique') {
-                        logger.debug(`Resetting values for attribute ${definition.name}`)
-                        valuesMap.set(definition.name, [])
-                    }
-                }
-            }
-
             for (const identity of identities) {
                 const sourceAccount = accountsMap.get(identity.id)
                 const account = await processIdentity(

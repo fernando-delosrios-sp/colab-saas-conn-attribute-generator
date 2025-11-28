@@ -127,18 +127,15 @@ export const processAttribute = (
     accountAttributes: { [key: string]: any },
     counter: () => number,
     values?: any[]
-) => {
-    if (definition.type === 'counter' && !counter) {
-        logger.info(`Skipping refresh for attribute ${definition.name} because it is of ${definition.type} type`)
-        return
-    }
+): void => {
+    // The UI only exposes "Refresh on each aggregation?" for normal attributes.
+    // For non-normal types (counter/unique), refresh is ignored so counters and
+    // uniqueness state are preserved across runs.
+    const isNormal = definition.type === 'normal'
+    const refresh = isNormal && definition.refresh
 
-    if (definition.type === 'unique' && !values) {
-        logger.info(`Skipping refresh for attribute ${definition.name} because it is of ${definition.type} type`)
-        return
-    }
-
-    let refresh = definition.refresh
+    // For counter/unique attributes we always preserve previously generated values;
+    // they are only built if missing on the account.
     if (refresh || accountAttributes[definition.name] === undefined) {
         logger.debug(`Building attribute ${definition.name} for identity ${identity.id}`)
         if (identity.attributes) {

@@ -65,7 +65,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Attribute Generation Settings",
-                    "sectionHelpMessage": "<strong>Define how account attributes are generated.</strong><br><br>Use <strong>Use search for aggregation?</strong> to optionally build attributes using results from an Identity search instead of only this source's accounts.<br><br>When search is enabled, enter an <strong>Identity Search Query</strong>. If <strong>Keep manually generated accounts outside the search query</strong> is enabled, accounts that were manually generated from this source are always included in aggregation even if they do not match the search query.<br><br>Use <strong>Attribute Generation Definitions</strong> to configure how each attribute is built (name, Apache Velocity expression, case, type, counter start, minimum counter digits, normalization, spacing, and refresh behavior). Counter-based and unique attributes can leverage incremental counters and existing values; when <strong>Refresh on each aggregation?</strong> is enabled for one of these attributes, its counter and collected values are reset on each run.<br><br>Toggle <strong>Support for incremental counters</strong> to enable stateful commands required for counter-based attributes to increment across connector runs.",
+                    "sectionHelpMessage": "<strong>Define how account attributes are generated.</strong><br><br>Use <strong>Use search for aggregation?</strong> to optionally build attributes using results from an Identity search instead of only this source's accounts.<br><br>When search is enabled, enter an <strong>Identity Search Query</strong>. If <strong>Keep manually generated accounts outside the search query</strong> is enabled, accounts that were manually generated from this source are always included in aggregation even if they do not match the search query.<br><br>Use <strong>Attribute Generation Definitions</strong> to configure how each attribute is built (name, Apache Velocity expression, case, type, counter start, minimum counter digits, normalization, spacing, and refresh behavior). <strong>Refresh on each aggregation?</strong> is only available for normal attributes and causes the attribute to be recalculated every aggregation run, even if it already has a value on the account. Counter-based and unique attributes always preserve their state across runs.<br><br>Toggle <strong>Support for incremental counters</strong> to enable stateful commands required for counter-based attributes to increment across connector runs.",
                     "items": [
                         {
                             "key": "useSearch",
@@ -190,8 +190,10 @@
                                         },
                                         {
                                             "key": "refresh",
-                                            "label": "Refresh on each aggregation? (when used with counter-based or unique attributes, this will reset the counter)",
-                                            "type": "toggle"
+                                            "label": "Refresh on each aggregation?",
+                                            "type": "toggle",
+                                            "parentKey": "type",
+                                            "parentValue": "normal"
                                         }
                                     ]
                                 }
