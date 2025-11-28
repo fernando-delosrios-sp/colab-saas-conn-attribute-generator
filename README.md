@@ -28,14 +28,16 @@ The Attribute Generator connector allows you to:
 -   Support incremental aggregation with stateful operations
 -   Reference previously generated attributes in subsequent attribute definitions
 -   Trigger account creation and attribute generation by assigning the "Generate" entitlement to identities
+-   Disable and enable accounts with automatic attribute refresh on enable
 
 ## Disclaimer
 
 **Important Operational Notes:**
 
--   **Limited Provisioning Support**: This connector supports account creation only through entitlement assignment (the "Generate" entitlement). It does not support traditional provisioning operations like account updates, disabling, or deletion. It is designed primarily for attribute generation and aggregation.
+-   **Provisioning Support**: This connector supports account creation through entitlement assignment (the "Generate" entitlement) and account disabling/enabling operations. It does not support traditional provisioning operations like account updates or deletion. It is designed primarily for attribute generation and aggregation.
 -   **Aggregation-Based Generation**: Attributes are generated on each account aggregation cycle to ensure consistency and avoid race conditions, particularly when generating unique and counter-based attributes.
 -   **On-Demand Generation**: Accounts can also be created on-demand by assigning the "Generate" entitlement to identities, triggering immediate attribute processing.
+-   **Account Enable with Force Refresh**: When an account is enabled, all attributes (including unique attributes) are force refreshed and recalculated. This ensures that unique attribute values are regenerated based on the current state of all accounts, preventing conflicts with attributes that may have been assigned to other accounts while the account was disabled.
 -   **Stateful Operations**: The connector maintains state between aggregation cycles to ensure proper sequencing of counter-based attributes and unique value generation.
 
 ## Prerequisites
@@ -122,6 +124,7 @@ Use Apache Velocity templates to generate attribute values based on existing ide
 Standard attribute generation using Velocity expressions.
 
 #### Unique Attributes
+
 Automatically ensures unique values across all identities by appending incremental counters with digit padding when conflicts occur. If the Velocity expression does not already reference a `$counter` variable, the connector will automatically append it for you when resolving conflicts. For example, if "john.doe" already exists, it will generate "john.doe001", "john.doe002", etc.
 
 #### Counter-based Attributes
@@ -133,6 +136,7 @@ Generates sequential numbers with configurable minimum digit padding (e.g., 001,
 Attributes are processed in the order they are defined, allowing subsequent attribute definitions to reference previously generated attributes. This enables complex attribute generation workflows where one attribute depends on another.
 
 ### Stateful Operations
+
 Supports incremental aggregation with persistent counters that maintain state between connector runs. When **Support for Incremental Counters** is enabled in the configuration, the connector saves counter positions between executions so counter-based and unique attributes can continue their sequences without resetting on every aggregation.
 
 ## Account Creation via Entitlement Assignment
@@ -175,6 +179,36 @@ To use entitlement-based account creation:
 4. Assign the "Generate" entitlement to identities either manually through the ISC interface or via automated provisioning policies
 
 > **Note**: Accounts created via entitlement assignment will still respect all configured attribute generation rules, including uniqueness constraints, counter-based attributes, and text transformations.
+
+## Account Management (Disable/Enable)
+
+The connector supports disabling and enabling accounts, providing control over account lifecycle management while ensuring attribute consistency.
+
+### Disabling Accounts
+
+When an account is disabled:
+
+-   The account is marked as disabled in Identity Security Cloud
+-   Existing attribute values are preserved
+-   The account is excluded from normal operations until re-enabled
+
+### Enabling Accounts
+
+When an account is enabled, the connector performs a **force refresh** of all attributes:
+
+-   **All attributes are recalculated**: Every configured attribute (normal, unique, and counter-based) is regenerated from scratch
+-   **Unique attributes are force refreshed**: Unique attributes are recalculated to ensure they don't conflict with values that may have been assigned to other accounts while this account was disabled
+-   **Current state consideration**: The regeneration process considers the current state of all accounts in the system, ensuring uniqueness constraints are properly enforced
+-   **Account re-activation**: The account is marked as enabled and ready for use
+
+### Use Cases for Disable/Enable
+
+-   **Temporary Account Suspension**: Temporarily disable accounts for users on leave or under investigation
+-   **Attribute Conflict Resolution**: Force refresh attributes when conflicts arise or when attribute generation rules change
+-   **Account Re-activation**: Safely re-enable accounts with fresh attribute values that comply with current uniqueness constraints
+-   **Compliance and Auditing**: Maintain account state while ensuring attributes remain consistent with current generation rules
+
+> **Important**: When enabling an account, be aware that all attribute values will be regenerated. If you need to preserve specific attribute values, consider updating the attribute generation rules or using account update operations before re-enabling.
 
 ## Development
 

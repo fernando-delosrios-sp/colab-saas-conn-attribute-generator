@@ -13,11 +13,13 @@ import {
     StdEntitlementListHandler,
     StdEntitlementListOutput,
     AttributeChangeOp,
+    StdAccountEnableHandler,
+    StdAccountDisableHandler,
 } from '@sailpoint/connector-sdk'
 import { ISCClient } from './isc-client'
 import { Config } from './model/config'
 import spec from '../connector-spec.json'
-import { IdentityDocument, Index } from 'sailpoint-api-client'
+import { IdentityDocument, Index, Account as ISCAccount } from 'sailpoint-api-client'
 import { processIdentity, StateWrapper } from './utils/attributeProcessing'
 import assert from 'assert'
 
@@ -37,8 +39,26 @@ export const connector = async () => {
     )!
     const sourceId = source.id as string
     assert(sourceId, 'Source ID not found')
+
+    const attributes = config.attributes ?? []
+    const uniqueAttributes = attributes.filter((x) => x.type === 'unique').map((x) => x.name)
+    logger.debug(`Processing ${uniqueAttributes.length} unique attributes`)
+
     logger.debug(`Found matching source with ID: ${sourceId}`)
     assert(config.useSearch && config.search !== undefined, 'Search query not found')
+
+    const buildValuesMap = (accounts: ISCAccount[]) => {
+        logger.debug(`Processing ${uniqueAttributes.length} unique attributes`)
+
+        const valuesMap = new Map<string, string[]>()
+        for (const attribute of uniqueAttributes) {
+            const values: string[] = accounts.map((x) => x.attributes?.[attribute]).filter((x) => x)
+            valuesMap.set(attribute, values)
+            logger.debug(`Collected ${values.length} values for attribute ${attribute}`)
+        }
+
+        return valuesMap
+    }
 
     const stdTestConnection: StdTestConnectionHandler = async (context, input, res) => {
         logger.debug('Testing connection')
@@ -47,7 +67,7 @@ export const connector = async () => {
             logger.debug('Connection test successful')
             res.send({})
         } catch (error) {
-            logger.error(`Connection test failed: ${error}`)
+            logger.error(`Connection test failed: ${error instanceof Error ? error.message : String(error)}`)
             throw new ConnectorError(error as string)
         }
     }
@@ -55,7 +75,6 @@ export const connector = async () => {
     const stdAccountDiscoverSchema: StdAccountDiscoverSchemaHandler = async (context, input, res) => {
         logger.debug('Discovering account schema')
         const schema: AccountSchema = spec.accountSchema
-        const attributes = config.attributes ?? []
 
         for (const attribute of attributes) {
             logger.debug(`Adding attribute to schema: ${attribute.name}`)
@@ -72,12 +91,6 @@ export const connector = async () => {
 
     const stdAccountList: StdAccountListHandler = async (context, input, res) => {
         logger.debug('Starting account list operation')
-        const attributes = config.attributes ?? []
-        const stateWrapper = new StateWrapper(input.state)
-
-        const uniqueAttributes = attributes.filter((x) => x.type === 'unique').map((x) => x.name)
-        logger.debug(`Processing ${uniqueAttributes.length} unique attributes`)
-        const valuesMap = new Map<string, string[]>()
 
         try {
             let search = `@accounts(source.id:${sourceId})`
@@ -93,13 +106,10 @@ export const connector = async () => {
             logger.info(`Found ${identities.length} identities`)
             const accounts = await isc.listAccountsBySource(sourceId)
             logger.info(`Found ${accounts.length} accounts`)
-            const accountsMap = new Map(accounts.map((x) => [x.identityId!, x]))
 
-            for (const attribute of uniqueAttributes) {
-                const values: string[] = accounts.map((x) => x.attributes?.[attribute]).filter((x) => x)
-                valuesMap.set(attribute, values)
-                logger.debug(`Collected ${values.length} values for attribute ${attribute}`)
-            }
+            const stateWrapper = new StateWrapper(input.state)
+            const accountsMap = new Map(accounts.map((x) => [x.identityId!, x]))
+            const valuesMap = buildValuesMap(accounts)
 
             for (const identity of identities) {
                 const sourceAccount = accountsMap.get(identity.id)
@@ -107,8 +117,8 @@ export const connector = async () => {
                     config.attributes,
                     identity,
                     sourceAccount,
-                    stateWrapper,
-                    valuesMap
+                    valuesMap,
+                    stateWrapper
                 )
                 logger.debug(`Sending account with ID: ${account.identity}`)
                 res.send(account)
@@ -116,10 +126,10 @@ export const connector = async () => {
 
             logger.info('Saving state')
             const stateObject = Object.fromEntries(stateWrapper.state)
-            logger.info(stateObject)
+            logger.info(`Saving state object: ${JSON.stringify(stateObject)}`)
             res.saveState(stateObject)
         } catch (error) {
-            logger.error(`Error in account list operation: ${error}`)
+            logger.error(`Error in account list operation: ${error instanceof Error ? error.message : String(error)}`)
             throw new ConnectorError(error as string)
         }
     }
@@ -127,7 +137,33 @@ export const connector = async () => {
     const stdAccountRead: StdAccountReadHandler = async (context, input, res) => {
         logger.debug(`Reading account for identity: ${input.identity}`)
         const identity = await isc.getIdentity(input.identity)
-        const account = await processIdentity(config.attributes, identity)
+        const account = await processIdentity(attributes, identity)
+        logger.debug(`Sending account with ID: ${input.identity}`)
+        res.send(account)
+    }
+
+    const stdAccountEnable: StdAccountEnableHandler = async (context, input, res) => {
+        const accounts = await isc.listAccountsBySource(sourceId)
+        logger.info(`Found ${accounts.length} accounts`)
+
+        //Force attribute refresh
+        const refreshAttributes = [...attributes]
+        refreshAttributes.forEach((x) => (x.refresh = true))
+        const valuesMap = buildValuesMap(accounts)
+        logger.debug(`Reading account for identity: ${input.identity}`)
+        const sourceAccount = accounts.find((x) => x.nativeIdentity! === input.identity)
+        const identity = await isc.getIdentity(input.identity)
+        const account = await processIdentity(refreshAttributes, identity, sourceAccount, valuesMap)
+        account.disabled = false
+        logger.debug(`Sending account with ID: ${input.identity}`)
+        res.send(account)
+    }
+
+    const stdAccountDisable: StdAccountDisableHandler = async (context, input, res) => {
+        logger.debug(`Reading account for identity: ${input.identity}`)
+        const identity = await isc.getIdentity(input.identity)
+        const account = await processIdentity(attributes, identity)
+        account.disabled = true
         logger.debug(`Sending account with ID: ${input.identity}`)
         res.send(account)
     }
@@ -135,7 +171,7 @@ export const connector = async () => {
     const stdAccountCreate: StdAccountCreateHandler = async (context, input, res) => {
         logger.debug(`Creating account for identity: ${input.attributes.name}`)
         const identity = await isc.getIdentityByName(input.attributes.name)
-        const account = await processIdentity(config.attributes, identity)
+        const account = await processIdentity(attributes, identity)
         account.attributes.actions = 'generate'
         logger.debug(`Sending account with ID: ${account.identity}`)
         res.send(account)
@@ -144,13 +180,12 @@ export const connector = async () => {
     const stdAccountUpdate: StdAccountUpdateHandler = async (context, input, res) => {
         logger.debug(`Updating account for identity: ${input.identity}`)
 
+        const identity = await isc.getIdentity(input.identity)
+        const account = await processIdentity(attributes, identity)
         for (const change of input.changes) {
             switch (change.op) {
                 case AttributeChangeOp.Set:
-                    break
-                case AttributeChangeOp.Add:
-                    break
-                case AttributeChangeOp.Remove:
+                    account.attributes[change.attribute] = change.value
                     break
                 default:
                     throw new ConnectorError('Only Set operations are supported')
@@ -161,8 +196,6 @@ export const connector = async () => {
             throw new ConnectorError('Only Set operations are supported')
         }
 
-        const identity = await isc.getIdentity(input.identity)
-        const account = await processIdentity(config.attributes, identity)
         logger.debug(`Sending account with ID: ${account.identity}`)
         res.send(account)
     }
@@ -186,6 +219,8 @@ export const connector = async () => {
         .stdTestConnection(stdTestConnection)
         .stdAccountList(stdAccountList)
         .stdAccountRead(stdAccountRead)
+        .stdAccountEnable(stdAccountEnable)
+        .stdAccountDisable(stdAccountDisable)
         .stdAccountCreate(stdAccountCreate)
         .stdAccountUpdate(stdAccountUpdate)
         .stdEntitlementList(stdEntitlementList)

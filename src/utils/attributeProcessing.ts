@@ -15,9 +15,8 @@ import { Account } from '../model/account'
 export class StateWrapper {
     state: Map<string, number> = new Map()
 
-    constructor(state: any) {
-        logger.info(`Initializing StateWrapper with state`)
-        logger.info(state)
+    constructor(state?: any) {
+        logger.info(`Initializing StateWrapper with state: ${JSON.stringify(state)}`)
         try {
             this.state = new Map(Object.entries(state))
         } catch (e) {
@@ -78,8 +77,8 @@ export const processAttributeDefinition = (definition: Attribute, attributes: Re
 export const buildAttribute = (
     definition: Attribute,
     attributes: RenderContext,
-    counter: () => number,
-    values: any[] = []
+    values: any[] = [],
+    counter?: () => number
 ): string | undefined => {
     logger.debug(
         `Building attribute: ${definition.name} with definition: ${JSON.stringify(
@@ -95,9 +94,7 @@ export const buildAttribute = (
             logger.error(`Counter is required for attribute ${definition.name}`)
             return
         }
-    }
-
-    if (definition.type === 'unique') {
+    } else {
         attributes.counter = ''
     }
 
@@ -111,7 +108,7 @@ export const buildAttribute = (
         }
         while (value && values?.includes(value)) {
             logger.debug(`Value ${value} already exists, generating new value for unique attribute: ${definition.name}`)
-            attributes.counter = padNumber(counter(), definition.digits)
+            attributes.counter = padNumber(counter!(), definition.digits)
             value = processAttributeDefinition(definition, attributes)
         }
         values?.push(value)
@@ -125,21 +122,13 @@ export const processAttribute = (
     definition: Attribute,
     identity: IdentityDocument,
     accountAttributes: { [key: string]: any },
-    counter: () => number,
-    values?: any[]
+    values?: string[],
+    counter?: () => number
 ): void => {
-    // The UI only exposes "Refresh on each aggregation?" for normal attributes.
-    // For non-normal types (counter/unique), refresh is ignored so counters and
-    // uniqueness state are preserved across runs.
-    const isNormal = definition.type === 'normal'
-    const refresh = isNormal && definition.refresh
-
-    // For counter/unique attributes we always preserve previously generated values;
-    // they are only built if missing on the account.
-    if (refresh || accountAttributes[definition.name] === undefined) {
+    if (definition.refresh || accountAttributes[definition.name] === undefined) {
         logger.debug(`Building attribute ${definition.name} for identity ${identity.id}`)
         if (identity.attributes) {
-            const value = buildAttribute(definition, identity.attributes, counter, values)
+            const value = buildAttribute(definition, identity.attributes, values, counter)
             accountAttributes![definition.name] = value
             identity.attributes[definition.name] = value
         } else {
@@ -153,20 +142,32 @@ export const processIdentity = (
     attributeDefinitions: Attribute[] | undefined,
     identity: IdentityDocument,
     sourceAccount?: ISCAccount,
-    stateWrapper?: StateWrapper,
-    valuesMap?: Map<string, string[]>
+    valuesMap?: Map<string, string[]>,
+    stateWrapper?: StateWrapper
 ): Account => {
     const attributes = attributeDefinitions ?? []
     let accountAttributes = sourceAccount?.attributes ?? { id: identity.id, name: identity.name }
 
     for (const definition of attributes) {
-        processAttribute(
-            definition,
-            identity,
-            accountAttributes,
-            stateWrapper?.getCounter(definition.name, definition.counterStart) ?? StateWrapper.getCounter(),
-            valuesMap?.get(definition.name)
-        )
+        let counter
+        switch (definition.type) {
+            case 'counter':
+                if (stateWrapper) {
+                    counter = stateWrapper?.getCounter(definition.name, definition.counterStart)
+                } else {
+                    logger.warn(`State wrapper is missing, skipping counter attribute ${definition.name}`)
+                    continue
+                }
+                break
+            case 'unique':
+                counter = StateWrapper.getCounter()
+                break
+            default:
+                break
+        }
+        const values = valuesMap?.get(definition.name)
+
+        processAttribute(definition, identity, accountAttributes, values, counter)
     }
 
     const account = new Account(accountAttributes)
