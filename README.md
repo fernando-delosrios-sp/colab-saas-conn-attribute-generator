@@ -20,10 +20,13 @@ This connector enables automated generation of custom attributes for identities 
 
 The Attribute Generator connector allows you to:
 
--   Generate custom attributes for identities based on Velocity expressions
+-   Generate custom attributes for identities based on Apache Velocity expressions with enhanced context
+-   Access JavaScript Math object, Date object, and date-fns library within Velocity expressions
 -   Apply various text transformations (case changes, normalization, space removal)
 -   Create unique attributes with automatic conflict resolution using counter digit padding
+-   Generate UUID (universally unique identifier) attributes automatically
 -   Generate counter-based attributes with configurable digit padding
+-   Set maximum length constraints on generated attributes with intelligent truncation
 -   Process identities based on search queries
 -   Support incremental aggregation with stateful operations
 -   Reference previously generated attributes in subsequent attribute definitions
@@ -88,8 +91,10 @@ The connector requires the following configuration:
     -   **Attribute Type**:
         -   **Normal**: Standard attribute generation
         -   **Unique**: Ensures unique values across all identities using counter digit padding for conflicts
+        -   **UUID**: Generates universally unique identifiers automatically (no expression required)
         -   **Counter-based**: Generates sequential numbers with configurable digit padding
     -   **Minimum Counter Digits**: Number of digits for counter-based attributes and unique attribute conflict resolution
+    -   **Maximum Length**: Optional maximum length for generated attribute values (truncates while preserving counters for unique/counter types)
     -   **Normalize Special Characters**: Remove or replace special characters
     -   **Remove Spaces**: Eliminate spaces from generated values
     -   **Refresh on Each Aggregation**: Regenerate attribute on each connector run
@@ -107,8 +112,60 @@ The connector requires the following configuration:
 
 Use Apache Velocity templates to generate attribute values based on existing identity attributes. All identity attributes are available as variables (e.g., `$firstname`, `$lastname`, `$email`), and previously generated attributes can be referenced by following attribute definitions.
 
+#### Enhanced Velocity Context
+
+The connector provides an enhanced Velocity context with additional utilities for advanced attribute generation:
+
+-   **Math**: Access to JavaScript Math object for mathematical operations
+-   **Date**: JavaScript Date object for date manipulation
+-   **Datefns**: Full date-fns library for advanced date formatting and manipulation
+
+#### Basic Examples
+
 ```velocity
 #set($initial = $firstname.substring(0, 1))$initial$lastname
+```
+
+#### Advanced Examples with Enhanced Context
+
+**Using Math operations:**
+
+```velocity
+## Generate a random 6-digit number
+$Math.floor($Math.random() * 1000000)
+
+## Calculate age-based value
+#set($age = 25)
+#set($factor = $Math.pow(2, $Math.floor($age / 10)))
+Employee-$factor
+```
+
+**Using Date operations:**
+
+```velocity
+## Generate timestamp-based identifier
+user-$Date.now()
+
+## Create date-based username
+#set($now = $Date.new())
+$firstname.$lastname.$now.getFullYear()
+```
+
+**Using Datefns for advanced date formatting:**
+
+```velocity
+## Format current date in various ways
+#set($now = $Date.new())
+user-$Datefns.format($now, "yyyyMMdd")
+
+## Add days to current date
+#set($futureDate = $Datefns.addDays($now, 30))
+$firstname-$Datefns.format($futureDate, "yyyy-MM-dd")
+
+## Calculate difference between dates
+#set($startDate = $Date.new())
+#set($endDate = $Datefns.addMonths($startDate, 6))
+$Datefns.differenceInDays($endDate, $startDate)
 ```
 
 ### Text Transformations
@@ -127,13 +184,100 @@ Standard attribute generation using Velocity expressions.
 
 Automatically ensures unique values across all identities by appending incremental counters with digit padding when conflicts occur. If the Velocity expression does not already reference a `$counter` variable, the connector will automatically append it for you when resolving conflicts. For example, if "john.doe" already exists, it will generate "john.doe001", "john.doe002", etc.
 
+#### UUID Attributes
+
+Generates universally unique identifiers (UUIDs) automatically using UUID v4 specification. UUID attributes do not require a Velocity expression as they are generated automatically. Each UUID is guaranteed to be unique across all identities. This is ideal for generating unique system identifiers, API keys, or external reference IDs.
+
+**Configuration Note:** When creating a UUID attribute, you can leave the Apache Velocity expression field with any placeholder text (it will be ignored) since UUIDs are generated automatically by the connector.
+
+**Example use cases:**
+-   External system integration identifiers
+-   API tokens or keys
+-   Unique reference numbers
+-   System-generated IDs that must be globally unique
+
+**Example Output:** `550e8400-e29b-41d4-a716-446655440000`
+
 #### Counter-based Attributes
 
 Generates sequential numbers with configurable minimum digit padding (e.g., 001, 002, 003).
 
+### Maximum Length
+
+All attribute types (except UUID) support an optional maximum length setting. When configured, the connector will truncate generated values to the specified length:
+
+-   **Normal attributes**: Truncated from the end
+-   **Unique attributes**: Truncated while preserving the counter suffix at the end (counter is always placed at the rightmost position within the length limit)
+-   **Counter-based attributes**: Truncated while preserving the counter value at the end
+
+**Example:**
+If you set a maximum length of 20 characters for a unique attribute:
+-   Expression: `$firstname.$lastname`
+-   Identity: firstname="Christopher", lastname="Montgomery"
+-   Without collision: `Christopher.Montgom` (truncated to 20 chars)
+-   With collision: `Christopher.Mont001` (truncated with counter preserved at end)
+
+This feature is particularly useful when integrating with systems that have field length restrictions.
+
 ### Attribute Referencing
 
 Attributes are processed in the order they are defined, allowing subsequent attribute definitions to reference previously generated attributes. This enables complex attribute generation workflows where one attribute depends on another.
+
+### Common Use Cases and Examples
+
+#### Generating Time-Based Usernames
+
+```velocity
+## Username with year-month
+#set($now = $Date.new())
+$firstname.$lastname.$Datefns.format($now, "yyyyMM")
+## Result: john.doe.202412
+```
+
+#### Creating Unique Employee IDs with Date Components
+
+```velocity
+## Employee ID with hire date
+#set($now = $Date.new())
+EMP-$Datefns.format($now, "yyyy")-$counter
+## Result: EMP-2024-001, EMP-2024-002, etc.
+```
+
+#### Generating Email Addresses with Collision Handling
+
+```velocity
+## Email with automatic uniqueness
+#set($initial = $firstname.substring(0, 1))
+$initial$lastname@company.com
+## Result: jdoe@company.com, jdoe001@company.com (if collision)
+```
+
+#### Creating License Keys with Random Components
+
+```velocity
+## License key with random segment
+#set($random = $Math.floor($Math.random() * 10000))
+LIC-$Datefns.format($Date.new(), "yyyy")-$random-$counter
+## Result: LIC-2024-7342-001
+```
+
+#### Formatted Display Names with Length Limits
+
+```velocity
+## Display name limited to 20 characters
+$firstname $lastname
+## With maxLength=20: "Christopher Montgom"
+```
+
+#### Generating Expiration Dates
+
+```velocity
+## Calculate future expiration date
+#set($now = $Date.new())
+#set($expiration = $Datefns.addYears($now, 1))
+$Datefns.format($expiration, "yyyy-MM-dd")
+## Result: 2025-12-03
+```
 
 ### Stateful Operations
 
@@ -256,12 +400,16 @@ npm run pack-zip
 
 ### Attribute Generation Scenarios
 
--   **Username Generation**: Create standardized usernames from name components
--   **Email Address Generation**: Generate email addresses based on name patterns
--   **Employee ID Generation**: Create sequential employee IDs with proper formatting
--   **Display Name Creation**: Generate formatted display names from various attributes
--   **Unique Identifier Generation**: Create unique identifiers for external system integration
+-   **Username Generation**: Create standardized usernames from name components with automatic uniqueness
+-   **Email Address Generation**: Generate email addresses based on name patterns with collision resolution
+-   **Employee ID Generation**: Create sequential employee IDs with proper formatting and date components
+-   **Display Name Creation**: Generate formatted display names from various attributes with length constraints
+-   **Unique Identifier Generation**: Create UUIDs or unique identifiers for external system integration
+-   **License Key Generation**: Generate license keys with random components and date-based segments
+-   **Time-Based Attributes**: Create attributes incorporating timestamps, expiration dates, or hire dates
+-   **Mathematical Calculations**: Generate attributes based on calculations (age-based values, percentages, etc.)
 -   **Complex Attribute Workflows**: Generate multiple related attributes where one depends on another
+-   **System Integration IDs**: Create standardized identifiers with length limits for systems with field restrictions
 
 ### Account Creation Scenarios
 
@@ -273,10 +421,12 @@ npm run pack-zip
 
 ## Dependencies
 
--   @sailpoint/connector-sdk: ^1.1.22
--   sailpoint-api-client: ^1.6.0
+-   @sailpoint/connector-sdk: ^1.1.35
+-   sailpoint-api-client: ^1.7.0
 -   transliteration: ^2.3.5
 -   velocityjs: ^2.1.5
+-   date-fns: ^4.1.0 (provides advanced date formatting and manipulation utilities in Velocity expressions)
+-   uuid: ^13.0.0 (provides UUID v4 generation for UUID attribute types)
 
 [New to the CoLab? Click here »](https://developer.sailpoint.com/discuss/t/about-the-sailpoint-developer-community-colab/11230)
 

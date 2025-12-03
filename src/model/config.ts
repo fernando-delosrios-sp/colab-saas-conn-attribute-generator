@@ -8,6 +8,7 @@ export interface Attribute {
     type: 'normal' | 'unique' | 'uuid' | 'counter'
     digits: number
     counterStart: number
+    maxLength?: number
 }
 
 export interface Config {

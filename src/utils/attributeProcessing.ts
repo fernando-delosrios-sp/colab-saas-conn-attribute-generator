@@ -11,6 +11,7 @@ import {
 import { ConnectorError, logger } from '@sailpoint/connector-sdk'
 import { Account as ISCAccount, IdentityDocument } from 'sailpoint-api-client'
 import { Account } from '../model/account'
+import { v4 as uuidv4 } from 'uuid'
 
 export class StateWrapper {
     state: Map<string, number> = new Map()
@@ -56,7 +57,7 @@ export const processAttributeDefinition = (definition: Attribute, attributes: Re
         return uuidv4()
     }
 
-    let value = evaluateVelocityTemplate(definition.expression, attributes)
+    let value = evaluateVelocityTemplate(definition.expression, attributes, definition.maxLength)
     if (value) {
         logger.debug(`Template evaluation result - attributeName: ${definition.name}, rawValue: ${value}`)
 
@@ -184,7 +185,4 @@ export const processIdentity = (
     const account = new Account(accountAttributes)
 
     return account
-}
-function uuidv4(): string | undefined {
-    throw new Error('Function not implemented.')
 }
