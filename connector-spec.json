@@ -159,6 +159,10 @@
                                                     "value": "unique"
                                                 },
                                                 {
+                                                    "label": "UUID",
+                                                    "value": "uuid"
+                                                },
+                                                {
                                                     "label": "Counter-based",
                                                     "value": "counter"
                                                 }

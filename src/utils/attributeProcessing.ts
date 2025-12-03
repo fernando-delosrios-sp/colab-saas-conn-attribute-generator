@@ -52,6 +52,10 @@ export class StateWrapper {
 }
 
 export const processAttributeDefinition = (definition: Attribute, attributes: RenderContext): string | undefined => {
+    if (definition.type === 'uuid') {
+        return uuidv4()
+    }
+
     let value = evaluateVelocityTemplate(definition.expression, attributes)
     if (value) {
         logger.debug(`Template evaluation result - attributeName: ${definition.name}, rawValue: ${value}`)
@@ -113,6 +117,13 @@ export const buildAttribute = (
         }
         values?.push(value)
         logger.debug(`Final unique value generated for attribute ${definition.name}: ${value}`)
+    } else if (definition.type === 'uuid') {
+        while (value && values?.includes(value)) {
+            logger.debug(`Value ${value} already exists, generating new value for uuid attribute: ${definition.name}`)
+            value = processAttributeDefinition(definition, attributes)
+        }
+        values?.push(value)
+        logger.debug(`Final uuid value generated for attribute ${definition.name}: ${value}`)
     }
 
     return value
@@ -173,4 +184,7 @@ export const processIdentity = (
     const account = new Account(accountAttributes)
 
     return account
+}
+function uuidv4(): string | undefined {
+    throw new Error('Function not implemented.')
 }

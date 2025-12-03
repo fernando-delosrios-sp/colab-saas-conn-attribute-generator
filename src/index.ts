@@ -41,7 +41,7 @@ export const connector = async () => {
     assert(sourceId, 'Source ID not found')
 
     const attributes = config.attributes ?? []
-    const uniqueAttributes = attributes.filter((x) => x.type === 'unique').map((x) => x.name)
+    const uniqueAttributes = attributes.filter((x) => x.type === 'unique' || x.type === 'uuid').map((x) => x.name)
     logger.debug(`Processing ${uniqueAttributes.length} unique attributes`)
 
     logger.debug(`Found matching source with ID: ${sourceId}`)

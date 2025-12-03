@@ -5,7 +5,7 @@ export interface Attribute {
     normalize: boolean
     spaces: boolean
     case: 'same' | 'lower' | 'upper' | 'capitalize'
-    type: 'normal' | 'unique' | 'counter'
+    type: 'normal' | 'unique' | 'uuid' | 'counter'
     digits: number
     counterStart: number
 }
