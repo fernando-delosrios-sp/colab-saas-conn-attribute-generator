@@ -19,7 +19,7 @@ export interface Config {
     clientId: string
     clientSecret: string
     attributes?: Attribute[]
-    counters?: Map<string, number>
+    counters?: { [key: string]: number } | string
     search?: string
     useSearch?: boolean
     keepManuallyGenerated?: boolean

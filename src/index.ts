@@ -19,7 +19,7 @@ import {
 import { ISCClient } from './isc-client'
 import { Config } from './model/config'
 import spec from '../connector-spec.json'
-import { IdentityDocument, Index, Account as ISCAccount } from 'sailpoint-api-client'
+import { IdentityDocument, Index, Account as ISCAccount, JsonPatchOperationV2025OpV2025 } from 'sailpoint-api-client'
 import { processIdentity, StateWrapper } from './utils/attributeProcessing'
 import { assert } from './utils/assert'
 
@@ -63,10 +63,28 @@ export const connector = async () => {
         return valuesMap
     }
 
+    const saveCounters = async (stateWrapper: StateWrapper) => {
+        logger.info('Saving counters to source configuration')
+        const countersObject = stateWrapper.getCountersObject()
+        logger.info(`Saving counters: ${JSON.stringify(countersObject)}`)
+
+        // Update the source configuration with the new counter values
+        // Use 'add' operation if counters don't exist, 'replace' if they do
+        const operation = config.counters ? JsonPatchOperationV2025OpV2025.Replace : JsonPatchOperationV2025OpV2025.Add
+        await isc.patchSource(sourceId, [
+            {
+                op: operation,
+                path: '/connectorAttributes/counters',
+                value: JSON.stringify(countersObject),
+            },
+        ])
+        logger.info('Counters saved successfully')
+    }
+
     const runChecks = () => {
         logger.debug('Running checks')
         assert(sourceId, 'Source ID not found')
-        assert(config.useSearch && config.search !== undefined, 'Search query not found')
+        assert(!config.useSearch || (config.useSearch && config.search), 'Search query not found')
         for (const attribute of attributes) {
             if (attribute.type !== 'uuid') {
                 assert(attribute.expression, 'Expression is required for non-uuid attributes')
@@ -129,7 +147,7 @@ export const connector = async () => {
             const accounts = await isc.listAccountsBySource(sourceId)
             logger.info(`Found ${accounts.length} accounts`)
 
-            const stateWrapper = new StateWrapper(input.state)
+            const stateWrapper = new StateWrapper(config.counters, false) // Batch mode
             const accountsMap = new Map(accounts.map((x) => [x.identityId!, x]))
             const valuesMap = buildValuesMap(accounts)
 
@@ -138,18 +156,16 @@ export const connector = async () => {
                 const account = await processIdentity(
                     config.attributes,
                     identity,
+                    stateWrapper,
                     sourceAccount,
                     valuesMap,
-                    stateWrapper
                 )
                 logger.debug(`Sending account with ID: ${account.identity}`)
                 res.send(account)
             }
 
-            logger.info('Saving state')
-            const stateObject = Object.fromEntries(stateWrapper.state)
-            logger.info(`Saving state object: ${JSON.stringify(stateObject)}`)
-            res.saveState(stateObject)
+            // Save counters to source configuration
+            await saveCounters(stateWrapper)
         } catch (error) {
             logger.error(`Error in account list operation: ${error instanceof Error ? error.message : String(error)}`)
             throw new ConnectorError(error as string)
@@ -161,7 +177,8 @@ export const connector = async () => {
         logger.debug(`Reading account for identity: ${input.identity}`)
         const identity = await isc.getIdentity(input.identity)
         const sourceAccount = await isc.getSourceAccount(input.identity, sourceId)
-        const account = await processIdentity(attributes, identity, sourceAccount)
+        const stateWrapper = new StateWrapper(config.counters, true) // Single account mode
+        const account = await processIdentity(attributes, identity, stateWrapper, sourceAccount)
         logger.debug(`Sending account with ID: ${input.identity}`)
         res.send(account)
     }
@@ -178,7 +195,8 @@ export const connector = async () => {
         logger.debug(`Reading account for identity: ${input.identity}`)
         const sourceAccount = accounts.find((x) => x.nativeIdentity! === input.identity)
         const identity = await isc.getIdentity(input.identity)
-        const account = await processIdentity(refreshAttributes, identity, sourceAccount, valuesMap)
+        const stateWrapper = new StateWrapper(config.counters, true) // Single account mode
+        const account = await processIdentity(refreshAttributes, identity, stateWrapper, sourceAccount, valuesMap)
         account.disabled = false
         logger.debug(`Sending account with ID: ${input.identity}`)
         res.send(account)
@@ -188,8 +206,9 @@ export const connector = async () => {
         runChecks()
         logger.debug(`Reading account for identity: ${input.identity}`)
         const identity = await isc.getIdentity(input.identity)
+        const stateWrapper = new StateWrapper(config.counters, true) // Single account mode
         const sourceAccount = await isc.getSourceAccount(input.identity, sourceId)
-        const account = await processIdentity(attributes, identity, sourceAccount)
+        const account = await processIdentity(attributes, identity, stateWrapper, sourceAccount)
         account.disabled = true
         logger.debug(`Sending account with ID: ${input.identity}`)
         res.send(account)
@@ -199,7 +218,8 @@ export const connector = async () => {
         runChecks()
         logger.debug(`Creating account for identity: ${input.attributes.name}`)
         const identity = await isc.getIdentityByName(input.attributes.name)
-        const account = await processIdentity(attributes, identity)
+        const stateWrapper = new StateWrapper(config.counters, true) // Single account mode
+        const account = await processIdentity(attributes, identity, stateWrapper)
         account.attributes.actions = 'generate'
         logger.debug(`Sending account with ID: ${account.identity}`)
         res.send(account)

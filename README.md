@@ -28,7 +28,7 @@ The Attribute Generator connector allows you to:
 -   Generate counter-based attributes with configurable digit padding
 -   Set maximum length constraints on generated attributes with intelligent truncation
 -   Process identities based on search queries
--   Support incremental aggregation with stateful operations
+-   Maintain counter state across aggregation runs using application configuration storage
 -   Reference previously generated attributes in subsequent attribute definitions
 -   Trigger account creation and attribute generation by assigning the "Generate" entitlement to identities
 -   Disable and enable accounts with automatic attribute refresh on enable
@@ -41,7 +41,7 @@ The Attribute Generator connector allows you to:
 -   **Aggregation-Based Generation**: Attributes are generated on each account aggregation cycle to ensure consistency and avoid race conditions, particularly when generating unique and counter-based attributes.
 -   **On-Demand Generation**: Accounts can also be created on-demand by assigning the "Generate" entitlement to identities, triggering immediate attribute processing.
 -   **Account Enable with Force Refresh**: When an account is enabled, all attributes (including unique attributes) are force refreshed and recalculated. This ensures that unique attribute values are regenerated based on the current state of all accounts, preventing conflicts with attributes that may have been assigned to other accounts while the account was disabled.
--   **Stateful Operations**: The connector maintains state between aggregation cycles to ensure proper sequencing of counter-based attributes and unique value generation.
+-   **Counter State Persistence**: The connector automatically stores counter values in the application configuration, ensuring proper sequencing of counter-based attributes across aggregation cycles.
 
 ## Prerequisites
 
@@ -98,7 +98,6 @@ The connector requires the following configuration:
     -   **Normalize Special Characters**: Remove or replace special characters
     -   **Remove Spaces**: Eliminate spaces from generated values
     -   **Refresh on Each Aggregation**: Regenerate attribute on each connector run
--   **Support for Incremental Counters**: Enable stateful operations so counter-based attributes can keep their sequence across connector runs
 
 ![Attribute Generation Configuration](assets/images/Attribute%20Generation%20Configuration.jpg)
 
@@ -279,9 +278,9 @@ $Datefns.format($expiration, "yyyy-MM-dd")
 ## Result: 2025-12-03
 ```
 
-### Stateful Operations
+### Counter State Persistence
 
-Supports incremental aggregation with persistent counters that maintain state between connector runs. When **Support for Incremental Counters** is enabled in the configuration, the connector saves counter positions between executions so counter-based and unique attributes can continue their sequences without resetting on every aggregation.
+The connector automatically maintains counter state between aggregation runs by storing counter values in the source's application configuration. Counter-based attributes will continue their sequences without resetting, ensuring consistent incremental values across all aggregation cycles. The counter state is transparently managed by the connector and requires no additional configuration or manual intervention.
 
 ## Account Creation via Entitlement Assignment
 

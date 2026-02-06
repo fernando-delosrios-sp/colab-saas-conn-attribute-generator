@@ -15,13 +15,21 @@ import { v4 as uuidv4 } from 'uuid'
 
 export class StateWrapper {
     state: Map<string, number> = new Map()
+    isSingleAccountMode: boolean
 
-    constructor(state?: any) {
-        logger.info(`Initializing StateWrapper with state: ${JSON.stringify(state)}`)
+    constructor(counters?: { [key: string]: number } | string, isSingleAccountMode: boolean = false) {
+        this.isSingleAccountMode = isSingleAccountMode
+        logger.info(
+            `Initializing StateWrapper with counters: ${JSON.stringify(counters)}, single account mode: ${isSingleAccountMode}`
+        )
         try {
-            this.state = new Map(Object.entries(state))
+            if (counters) {
+                // Handle both object and JSON string formats
+                const countersObj = typeof counters === 'string' ? JSON.parse(counters) : counters
+                this.state = new Map(Object.entries(countersObj).map(([k, v]) => [k, Number(v)]))
+            }
         } catch (e) {
-            logger.error('Failed to convert state object to Map. Initializing with empty Map')
+            logger.error('Failed to convert counters to Map. Initializing with empty Map')
             this.state = new Map()
         }
     }
@@ -50,6 +58,10 @@ export class StateWrapper {
         if (!this.state.has(key)) {
             this.state.set(key, start)
         }
+    }
+
+    getCountersObject(): { [key: string]: number } {
+        return Object.fromEntries(this.state)
     }
 }
 
@@ -136,9 +148,18 @@ export const processAttribute = (
     identity: IdentityDocument,
     accountAttributes: { [key: string]: any },
     values?: string[],
-    counter?: () => number
+    counter?: () => number,
+    isSingleAccountMode?: boolean
 ): void => {
     if (definition.refresh || accountAttributes[definition.name] === undefined) {
+        // Warn about race conditions in single account mode
+        if (isSingleAccountMode && (definition.type === 'counter' || definition.type === 'unique')) {
+            logger.warn(
+                `Processing ${definition.type} attribute "${definition.name}" in single account mode. ` +
+                `This may cause race conditions or duplicate values. Consider using batch operations for consistent results.`
+            )
+        }
+
         logger.debug(`Building attribute ${definition.name} for identity ${identity.id}`)
         if (identity.attributes) {
             const value = buildAttribute(definition, identity.attributes, values, counter)
@@ -154,12 +175,13 @@ export const processAttribute = (
 export const processIdentity = (
     attributeDefinitions: Attribute[] | undefined,
     identity: IdentityDocument,
+    stateWrapper?: StateWrapper,
     sourceAccount?: ISCAccount,
     valuesMap?: Map<string, string[]>,
-    stateWrapper?: StateWrapper
 ): Account => {
     const attributes = attributeDefinitions ?? []
     let accountAttributes = sourceAccount?.attributes ?? { id: identity.id, name: identity.name }
+    const isSingleAccountMode = stateWrapper?.isSingleAccountMode ?? false
 
     for (const definition of attributes) {
         let counter
@@ -180,7 +202,7 @@ export const processIdentity = (
         }
         const values = valuesMap?.get(definition.name)
 
-        processAttribute(definition, identity, accountAttributes, values, counter)
+        processAttribute(definition, identity, accountAttributes, values, counter, isSingleAccountMode)
     }
 
     const account = new Account(accountAttributes)
