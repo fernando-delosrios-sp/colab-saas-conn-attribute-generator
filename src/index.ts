@@ -181,6 +181,8 @@ export const connector = async () => {
         const account = await processIdentity(attributes, identity, stateWrapper, sourceAccount)
         logger.debug(`Sending account with ID: ${input.identity}`)
         res.send(account)
+        // Save counters to source configuration
+        await saveCounters(stateWrapper)
     }
 
     const stdAccountEnable: StdAccountEnableHandler = async (context, input, res) => {
@@ -200,6 +202,8 @@ export const connector = async () => {
         account.disabled = false
         logger.debug(`Sending account with ID: ${input.identity}`)
         res.send(account)
+        // Save counters to source configuration
+        await saveCounters(stateWrapper)
     }
 
     const stdAccountDisable: StdAccountDisableHandler = async (context, input, res) => {
@@ -212,6 +216,8 @@ export const connector = async () => {
         account.disabled = true
         logger.debug(`Sending account with ID: ${input.identity}`)
         res.send(account)
+        // Save counters to source configuration
+        await saveCounters(stateWrapper)
     }
 
     const stdAccountCreate: StdAccountCreateHandler = async (context, input, res) => {
@@ -223,6 +229,8 @@ export const connector = async () => {
         account.attributes.actions = 'generate'
         logger.debug(`Sending account with ID: ${account.identity}`)
         res.send(account)
+        // Save counters to source configuration
+        await saveCounters(stateWrapper)
     }
 
     const stdAccountUpdate: StdAccountUpdateHandler = async (context, input, res) => {
@@ -230,6 +238,7 @@ export const connector = async () => {
         logger.debug(`Updating account for identity: ${input.identity}`)
 
         const identity = await isc.getIdentity(input.identity)
+        const stateWrapper = new StateWrapper(config.counters, true) // Single account mode
         const account = await processIdentity(attributes, identity)
         for (const change of input.changes) {
             switch (change.op) {
@@ -247,6 +256,8 @@ export const connector = async () => {
 
         logger.debug(`Sending account with ID: ${account.identity}`)
         res.send(account)
+        // Save counters to source configuration
+        await saveCounters(stateWrapper)
     }
 
     const stdEntitlementList: StdEntitlementListHandler = async (context, input, res) => {
